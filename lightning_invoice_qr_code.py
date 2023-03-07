@@ -1,11 +1,10 @@
 import io
-import pyzbar.pyzbar as pyzbar
-import qrcode
 import os
+import qrcode
+import requests
 from PIL import Image
 from pyln.client import LightningRpc
-import hashlib
-import requests
+import pyzbar.pyzbar as pyzbar
 
 
 class InvalidFileError(Exception):
@@ -17,43 +16,47 @@ class RpcConnectionError(Exception):
 
 
 def prompt_for_rpc_path():
-    rpc_path = input("Enter path to your lightning-rpc: ")
-    if not os.path.isfile(rpc_path):
-        raise InvalidFileError("File path is not valid")
+    while True:
+        rpc_path = input("Enter path to your lightning-rpc: ")
+        if not os.path.isfile(rpc_path):
+            print("Error: File path is not valid")
+        else:
+            try:
+                rpc = LightningRpc(rpc_path, ssl=True)
+                return rpc
+            except RpcConnectionError:
+                print("Error: Unable to connect to RPC server")
 
-    try:
-        rpc = LightningRpc(rpc_path)
-    except:
-        raise RpcConnectionError("Unable to connect to RPC server")
 
-    return rpc
-
-
-def generate_qr_code(invoice):
+def generate_and_save_qr_code(invoice, img_path):
     qr = qrcode.QRCode(
         version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(invoice)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
-    img_path = input("Enter file path to save QR code image: ")
     img.save(img_path)
     print("QR code image saved to:", img_path)
 
 
-def decode_qr_code():
-    img_path = input("Enter path to image file containing QR code: ")
+def decode_qr_code(img_path):
     with open(img_path, 'rb') as image_file:
         image = Image.open(io.BytesIO(image_file.read()))
         image.load()
 
     codes = pyzbar.decode(image)
+    if not codes:
+        raise ValueError("No QR code found in the image")
+
     invoice = codes[0].data.decode('utf-8')
 
     return invoice
 
 
 def check_payment_details(invoice, rpc):
-    payment_details = rpc.decodepay(invoice)
+    try:
+        payment_details = rpc.decodepay(invoice)
+    except:
+        return "Invalid Lightning invoice"
 
     amount = payment_details['msatoshi'] / 1000
     description = payment_details['description']
@@ -65,7 +68,7 @@ def check_payment_details(invoice, rpc):
     if "hack" in description.lower() or "malicious" in description.lower():
         return "Malicious invoice description"
 
-    decoded = rpc.decodepay(invoice['bolt11'])
+    decoded = rpc.decodepay(payment_details['bolt11'])
     if decoded['payment_hash'] != payment_hash:
         return "Invalid payment hash"
 
@@ -94,21 +97,24 @@ def check_payment_details(invoice, rpc):
 def main():
     try:
         rpc = prompt_for_rpc_path()
-    except InvalidFileError as e:
-        print("Error: ", e)
-        return
-    except RpcConnectionError as e:
-        print("Error: ", e)
+    except InvalidFileError:
         return
 
-    invoice = input("Enter Lightning invoice: ")
-    generate_qr_code(invoice)
+    while True:
+        invoice = input("Enter Lightning invoice: ")
+        if not invoice.startswith("ln"):
+            print("Error: Invalid Lightning invoice")
+            continue
 
-    invoice = decode_qr_code()
+        img_path = input("Enter file path to save QR code image: ")
+        generate_and_save_qr_code(invoice, img_path)
 
-    result = check_payment_details(invoice, rpc)
-    print(result)
+        try:
+            invoice = decode_qr_code(img_path)
+        except ValueError as e:
+            print("Error:", e)
+            continue
 
-
-if __name__ == "__main__":
-    main()
+        validation_result = check_payment_details(invoice, rpc)
+        print(validation_result)
+        break
