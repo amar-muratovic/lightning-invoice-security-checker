@@ -52,6 +52,32 @@ def decode_qr_code(img_path):
     return invoice
 
 
+def scan_qr_code():
+    try:
+        from PIL import ImageGrab
+    except ImportError:
+        print(
+            "Error: Pillow library not found. Please install it with 'pip install pillow'")
+        return
+
+    print("Please position your QR code on the screen")
+
+    # Allow user to select a region on the screen
+    input("Press Enter to capture screen...")
+    screen = ImageGrab.grab()
+    screen.show()
+
+    # Convert image to grayscale for barcode detection
+    screen = screen.convert('L')
+    codes = pyzbar.decode(screen)
+
+    if not codes:
+        raise ValueError("No QR code found in the screen capture")
+
+    invoice = codes[0].data.decode('utf-8')
+    return invoice
+
+
 def check_payment_details(invoice, rpc):
     try:
         payment_details = rpc.decodepay(invoice)
@@ -101,19 +127,35 @@ def main():
         return
 
     while True:
-        invoice = input("Enter Lightning invoice: ")
-        if not invoice.startswith("ln"):
-            print("Error: Invalid Lightning invoice")
+        user_input = input("Enter Lightning invoice or QR code file path: ")
+        if os.environ.get('QR_FILE_PATH') and user_input == "":
+            img_path = os.environ['QR_FILE_PATH']
+            try:
+                invoice = decode_qr_code(img_path)
+            except ValueError as e:
+                print("Error:", e)
+                continue
+        elif user_input.startswith("ln"):
+            invoice = user_input
+        else:
+            print("Error: Invalid input")
             continue
 
-        img_path = input("Enter file path to save QR code image: ")
-        generate_and_save_qr_code(invoice, img_path)
+        if os.environ.get('SCAN_QR_CODE') and not os.environ.get('QR_FILE_PATH'):
+            qr_data = scan_qr_code()
+            if qr_data:
+                try:
+                    invoice = decode_qr_code(io.BytesIO(qr_data))
+                except ValueError as e:
+                    print("Error:", e)
+                    continue
+            else:
+                continue
 
-        try:
-            invoice = decode_qr_code(img_path)
-        except ValueError as e:
-            print("Error:", e)
-            continue
+        img_path = input(
+            "Enter file path to save QR code image (leave empty to skip): ")
+        if img_path:
+            generate_and_save_qr_code(invoice, img_path)
 
         validation_result = check_payment_details(invoice, rpc)
         print(validation_result)
