@@ -5,6 +5,7 @@ import qrcode
 import requests
 import hashlib
 import base64
+import argparse
 import nacl.signing
 from PIL import Image
 from pyln.client import LightningRpc
@@ -21,16 +22,23 @@ class RpcConnectionError(Exception):
 
 
 def prompt_for_rpc_path():
-    while True:
-        rpc_path = input("Enter path to your lightning-rpc: ")
-        if not os.path.isfile(rpc_path):
-            print("Error: File path is not valid")
-        else:
-            try:
-                rpc = LightningRpc(rpc_path, ssl=True)
-                return rpc
-            except RpcConnectionError:
-                print("Error: Unable to connect to RPC server")
+    parser = argparse.ArgumentParser(
+        description='Enter path to your lightning-rpc')
+    parser.add_argument('rpc_path', type=str,
+                        help='path to your lightning-rpc file')
+
+    args = parser.parse_args()
+
+    rpc_path = args.rpc_path
+
+    if not os.path.isfile(rpc_path):
+        print("Error: File path is not valid")
+    else:
+        try:
+            rpc = LightningRpc(rpc_path, ssl=True)
+            return rpc
+        except RpcConnectionError:
+            print("Error: Unable to connect to RPC server")
 
 
 def generate_and_save_qr_code(invoice, img_path):
@@ -63,12 +71,18 @@ def scan_qr_code():
     except ImportError:
         print(
             "Error: Pillow library not found. Please install it with 'pip install pillow'")
-        return
+        quit()
 
-    print("Please position your QR code on the screen")
+    parser = argparse.ArgumentParser(
+        description='Scan a QR code from the screen')
+    parser.add_argument('--position', default=False, action='store_true',
+                        help='Show a rectangle to select the position of the QR code on the screen')
+    args = parser.parse_args()
 
-    # Allow user to select a region on the screen
-    input("Press Enter to capture screen...")
+    if args.position:
+        print("Please position your QR code on the screen")
+        input("Press Enter to capture screen...")
+
     screen = ImageGrab.grab()
     screen.show()
 
