@@ -1,5 +1,6 @@
 import io
 import os
+import time
 import qrcode
 import requests
 import hashlib
@@ -221,6 +222,50 @@ def verify_invoice_signature(invoice, pubkey):
         return True
     except:
         return False
+
+
+def validate_invoice(invoice, recipient, expected_amount, expected_description, expected_hash, expected_expiry, expected_secret=None, expected_description_hash=None):
+    if not invoice:
+        return False
+
+    # Check if payee node ID matches the intended recipient
+    if invoice.get('payee') != recipient:
+        return False
+
+    # Check if invoice has routing hints or fallback addresses
+    if invoice.get('routing_info') is None or invoice.get('fallback_addr') is None:
+        return False
+
+    # Check if invoice has an amount field and if it matches the expected payment amount
+    if invoice.get('num_satoshis') != expected_amount:
+        return False
+
+    # Check if invoice has an expiration time and if it has not yet expired
+    if invoice.get('expiry') < time.time():
+        return False
+
+    # Check if invoice has a description field and if it matches the expected payment description
+    if invoice.get('description') != expected_description:
+        return False
+
+    # Check if invoice has a payment hash field and if it matches the expected payment hash
+    if invoice.get('payment_hash') != expected_hash:
+        return False
+
+    # Check if invoice has a min_final_cltv_expiry field and if it is not lower than the expected value
+    if invoice.get('min_final_cltv_expiry') < expected_expiry:
+        return False
+
+    # Check if invoice has a description_hash field and if it matches the expected payment description hash
+    if expected_description_hash and invoice.get('description_hash') != expected_description_hash:
+        return False
+
+    # Check if invoice has a payment_secret field and if it matches the expected payment secret (if provided)
+    if expected_secret and invoice.get('payment_secret') != expected_secret:
+        return False
+
+    # All checks passed, invoice is valid
+    return True
 
 
 class Invoice:
