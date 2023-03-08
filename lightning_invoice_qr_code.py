@@ -2,8 +2,12 @@ import io
 import os
 import qrcode
 import requests
+import hashlib
+import base64
+import nacl.signing
 from PIL import Image
 from pyln.client import LightningRpc
+from datetime import datetime, timedelta
 import pyzbar.pyzbar as pyzbar
 
 
@@ -161,6 +165,83 @@ def check_payment_details(invoice, rpc):
         return "Invoice covers another invoice"
 
     return "Invoice is valid"
+
+
+def is_invoice_expired(invoice, min_expiry_time=timedelta(minutes=5), max_expiry_time=timedelta(days=30)):
+    """
+    Checks if the invoice has expired and if the expiry time is reasonable.
+    
+    Parameters:
+    invoice (dict): A dictionary representing an invoice with keys "expiry_time" and "amount".
+    min_expiry_time (timedelta): The minimum acceptable expiry time.
+    max_expiry_time (timedelta): The maximum acceptable expiry time.
+    
+    Returns:
+    bool: True if the invoice has expired or the expiry time is not reasonable, False otherwise.
+    """
+    now = datetime.utcnow()
+    expiry_time = datetime.fromisoformat(invoice["expiry_time"])
+
+    if now > expiry_time:
+        return True
+
+    if expiry_time - now < min_expiry_time or expiry_time - now > max_expiry_time:
+        return True
+
+    return False
+
+
+def verify_invoice_signature(invoice, pubkey):
+    """
+    Verify that the invoice has been signed by the given public key.
+
+    Args:
+        invoice (str): The invoice to verify.
+        pubkey (str): The public key to verify the signature against.
+
+    Returns:
+        bool: True if the signature is valid, False otherwise.
+    """
+
+    # Split the invoice into its parts
+    signature_b64, message_b64 = invoice.split(":", 1)
+
+    # Decode the signature and message from base64
+    signature = base64.b64decode(signature_b64)
+    message = base64.b64decode(message_b64)
+
+    # Hash the message
+    message_hash = hashlib.sha256(message).digest()
+
+    # Verify the signature using the given public key
+    try:
+        verifying_key = nacl.signing.VerifyKey(
+            pubkey, encoder=nacl.encoding.HexEncoder)
+        verifying_key.verify(message_hash, signature)
+        return True
+    except:
+        return False
+
+
+class Invoice:
+    def __init__(self, amount):
+        self.amount = amount
+        self.status = "unpaid"
+        self.payment_attempts = 0
+
+    def pay(self, payment_amount):
+        if self.status == "paid":
+            print("Invoice already paid.")
+        elif payment_amount == self.amount:
+            self.status = "paid"
+            self.payment_attempts += 1
+            print("Invoice paid successfully.")
+        else:
+            print("Payment amount does not match invoice amount.")
+
+    def check_payment_attempts(self):
+        if self.payment_attempts >= 2:
+            print("Multiple payment attempts detected. Please contact customer support.")
 
 
 def main():
