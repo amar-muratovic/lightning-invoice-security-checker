@@ -96,74 +96,56 @@ def check_payment_details(invoice, rpc):
 
     try:
         amount = payment_details['msatoshi'] / Constants.PAYMENT_FACTOR
+        if amount <= 0 or amount > Constants.MAX_PAYMENT_AMOUNT / Constants.PAYMENT_FACTOR:
+            raise ValueError("Invalid payment amount")
     except KeyError:
         return "Invalid payment details: amount"
 
-    if amount <= 0:
-        return "Invalid payment amount"
-    if amount > Constants.MAX_PAYMENT_AMOUNT / Constants.PAYMENT_FACTOR:
-        return "Payment amount exceeds the maximum allowed amount"
-
     try:
         description = payment_details['description']
+        if "hack" in description.lower() or "malicious" in description.lower():
+            raise ValueError("Malicious invoice description")
     except KeyError:
         return "Invalid payment details: description"
 
     try:
         payment_hash = payment_details['payment_hash']
+        decoded = rpc.decodepay(payment_details['bolt11'])
+        if decoded['payment_hash'] != payment_hash:
+            raise ValueError("Invalid payment hash")
+        if decoded['description_hash'] is not None:
+            raise ValueError("Invoice covers another invoice")
+        expiry = decoded['expiry']
+        if expiry <= 0:
+            raise ValueError("Invoice has expired")
+        payment_preimage = decoded['payment_preimage']
+        if not payment_preimage:
+            raise ValueError("Invalid payment preimage")
     except KeyError:
-        return "Invalid payment details: payment_hash"
+        return "Invalid payment details"
+    except ValueError as e:
+        return "Invalid payment details: " + str(e)
 
     try:
         payee_node_id = payment_details['payee_node_id']
+        with requests.Session() as session:
+            r = session.get("https://1ml.com/node/" + payee_node_id)
+            if r.status_code != 200:
+                raise ValueError("Invalid payee node ID")
     except KeyError:
         return "Invalid payment details: payee_node_id"
-
-    if amount <= 0:
-        return "Invalid payment amount"
-    if "hack" in description.lower() or "malicious" in description.lower():
-        return "Malicious invoice description"
-
-    try:
-        decoded = rpc.decodepay(payment_details['bolt11'])
-    except ValueError:
-        return "Invalid payment details: bolt11"
-
-    if decoded['payment_hash'] != payment_hash:
-        return "Invalid payment hash"
-
-    with requests.Session() as session:
-        r = session.get("https://1ml.com/node/" + payee_node_id)
-        if r.status_code != 200:
-            return "Invalid payee node ID"
+    except ValueError as e:
+        return "Invalid payment details: " + str(e)
 
     try:
         payment_status = rpc.listinvoices(
             payment_hash)['invoices'][0]['status']
+        if payment_status != 'unpaid':
+            raise ValueError("Invoice has already been paid")
     except (IndexError, KeyError):
         return "Invalid payment details: payment_status"
-
-    if payment_status != 'unpaid':
-        return "Invoice has already been paid"
-
-    try:
-        expiry = decoded['expiry']
-    except KeyError:
-        return "Invalid payment details: expiry"
-
-    if expiry <= 0:
-        return "Invoice has expired"
-
-    try:
-        payment_preimage = decoded['payment_preimage']
-    except KeyError:
-        return "Invalid payment details: payment_preimage"
-
-    if not payment_preimage:
-        return "Invalid payment preimage"
-
-    if decoded['description_hash'] is not None:
-        return "Invoice covers another invoice"
+    except ValueError as e:
+        return "Invalid payment details: " + str(e)
 
     return "Invoice is valid"
 
