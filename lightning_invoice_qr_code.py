@@ -78,23 +78,46 @@ def scan_qr_code():
     return invoice
 
 
+class Constants:
+    PAYMENT_FACTOR = 1000
+
+
 def check_payment_details(invoice, rpc):
     try:
         payment_details = rpc.decodepay(invoice)
-    except:
+    except ValueError:
         return "Invalid Lightning invoice"
 
-    amount = payment_details['msatoshi'] / 1000
-    description = payment_details['description']
-    payment_hash = payment_details['payment_hash']
-    payee_node_id = payment_details['payee_node_id']
+    try:
+        amount = payment_details['msatoshi'] / Constants.PAYMENT_FACTOR
+    except KeyError:
+        return "Invalid payment details: amount"
+
+    try:
+        description = payment_details['description']
+    except KeyError:
+        return "Invalid payment details: description"
+
+    try:
+        payment_hash = payment_details['payment_hash']
+    except KeyError:
+        return "Invalid payment details: payment_hash"
+
+    try:
+        payee_node_id = payment_details['payee_node_id']
+    except KeyError:
+        return "Invalid payment details: payee_node_id"
 
     if amount <= 0:
         return "Invalid payment amount"
     if "hack" in description.lower() or "malicious" in description.lower():
         return "Malicious invoice description"
 
-    decoded = rpc.decodepay(payment_details['bolt11'])
+    try:
+        decoded = rpc.decodepay(payment_details['bolt11'])
+    except ValueError:
+        return "Invalid payment details: bolt11"
+
     if decoded['payment_hash'] != payment_hash:
         return "Invalid payment hash"
 
@@ -103,15 +126,29 @@ def check_payment_details(invoice, rpc):
         if r.status_code != 200:
             return "Invalid payee node ID"
 
-    payment_status = rpc.listinvoices(payment_hash)['invoices'][0]['status']
+    try:
+        payment_status = rpc.listinvoices(
+            payment_hash)['invoices'][0]['status']
+    except (IndexError, KeyError):
+        return "Invalid payment details: payment_status"
+
     if payment_status != 'unpaid':
         return "Invoice has already been paid"
 
-    expiry = decoded['expiry']
+    try:
+        expiry = decoded['expiry']
+    except KeyError:
+        return "Invalid payment details: expiry"
+
     if expiry <= 0:
         return "Invoice has expired"
 
-    if not decoded['payment_preimage']:
+    try:
+        payment_preimage = decoded['payment_preimage']
+    except KeyError:
+        return "Invalid payment details: payment_preimage"
+
+    if not payment_preimage:
         return "Invalid payment preimage"
 
     if decoded['description_hash'] is not None:
