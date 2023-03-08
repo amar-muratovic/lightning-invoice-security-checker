@@ -168,25 +168,21 @@ def check_payment_details(invoice, rpc):
     return "Invoice is valid"
 
 
-def is_invoice_expired(invoice, min_expiry_time=timedelta(minutes=5), max_expiry_time=timedelta(days=30)):
+def is_invoice_expired(invoice, expiry_time):
     """
-    Checks if the invoice has expired and if the expiry time is reasonable.
+    Checks if the invoice has expired given an expiry time.
     
     Parameters:
     invoice (dict): A dictionary representing an invoice with keys "expiry_time" and "amount".
-    min_expiry_time (timedelta): The minimum acceptable expiry time.
-    max_expiry_time (timedelta): The maximum acceptable expiry time.
+    expiry_time (datetime): The expiry time for the invoice.
     
     Returns:
-    bool: True if the invoice has expired or the expiry time is not reasonable, False otherwise.
+    bool: True if the invoice has expired, False otherwise.
     """
     now = datetime.utcnow()
-    expiry_time = datetime.fromisoformat(invoice["expiry_time"])
+    invoice_expiry_time = datetime.fromisoformat(invoice["expiry_time"])
 
-    if now > expiry_time:
-        return True
-
-    if expiry_time - now < min_expiry_time or expiry_time - now > max_expiry_time:
+    if now > expiry_time or invoice_expiry_time > expiry_time:
         return True
 
     return False
