@@ -32,3 +32,11 @@ The check_invoice function included in the script performs several checks to ens
 
 Note: This script is designed to work with a Lightning node's RPC server. You will need to have access to an active Lightning node in order to use this script.
 
+DONATION:
+
+    Lightning network: croppednode01@walletofsatoshi.com
+
+    BTC: bc1qk4qqspj7zqjk20y0xectd540a8wz9wgtkfqz46
+
+
+
