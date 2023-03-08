@@ -80,6 +80,7 @@ def scan_qr_code():
 
 class Constants:
     PAYMENT_FACTOR = 1000
+    MAX_PAYMENT_AMOUNT = 100000000  # 1 BTC in satoshis
 
 
 def check_payment_details(invoice, rpc):
@@ -92,6 +93,11 @@ def check_payment_details(invoice, rpc):
         amount = payment_details['msatoshi'] / Constants.PAYMENT_FACTOR
     except KeyError:
         return "Invalid payment details: amount"
+
+    if amount <= 0:
+        return "Invalid payment amount"
+    if amount > Constants.MAX_PAYMENT_AMOUNT / Constants.PAYMENT_FACTOR:
+        return "Payment amount exceeds the maximum allowed amount"
 
     try:
         description = payment_details['description']
