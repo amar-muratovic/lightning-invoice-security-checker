@@ -7,6 +7,8 @@ import hashlib
 import base64
 import argparse
 import nacl.signing
+import json
+import csv
 from io import BytesIO
 from PIL import Image
 from pyln.client import LightningRpc
@@ -298,7 +300,7 @@ class Invoice:
             print("Multiple payment attempts detected. Please contact customer support.")
 
 
-def main():
+def main(output_format, output_stream):
     try:
         rpc = prompt_for_rpc_path()
     except InvalidFileError:
@@ -336,5 +338,15 @@ def main():
             generate_and_save_qr_code(invoice, img_path)
 
         validation_result = check_payment_details(invoice, rpc)
-        print(validation_result)
+
+        if output_format == 'json':
+            json.dump(validation_result, output_stream)
+            output_stream.write('\n')
+        elif output_format == 'csv':
+            csv_output = csv.writer(output_stream)
+            for k, v in validation_result.items():
+                csv_output.writerow([k, v])
+        else:
+            print(validation_result)
+
         break
