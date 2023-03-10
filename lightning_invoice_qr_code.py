@@ -7,6 +7,7 @@ import hashlib
 import base64
 import argparse
 import nacl.signing
+from io import BytesIO
 from PIL import Image
 from pyln.client import LightningRpc
 from datetime import datetime, timedelta
@@ -41,14 +42,30 @@ def prompt_for_rpc_path():
             print("Error: Unable to connect to RPC server")
 
 
-def generate_and_save_qr_code(invoice, img_path):
+def generate_and_display_qr_code(invoice, is_lip=False):
+    if is_lip:
+        invoice = "lightning:" + invoice
     qr = qrcode.QRCode(
         version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(invoice)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
-    img.save(img_path)
-    print("QR code image saved to:", img_path)
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    img = Image.open(buffer)
+    img.show()
+
+
+def generate_and_save_qr_code(invoice, file_path, is_lip=False):
+    if is_lip:
+        invoice = "lightning:" + invoice
+    qr = qrcode.QRCode(
+        version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+    qr.add_data(invoice)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img.save(file_path)
 
 
 def decode_qr_code(img_path):
@@ -109,8 +126,8 @@ def check_payment_details(invoice, rpc):
         return "Invalid Lightning invoice"
 
     try:
-        amount = payment_details['msatoshi'] / Constants.PAYMENT_FACTOR
-        if amount <= 0 or amount > Constants.MAX_PAYMENT_AMOUNT / Constants.PAYMENT_FACTOR:
+        amount = payment_details['msatoshi'] / 1000
+        if amount <= 0 or amount > 0.042:
             raise ValueError("Invalid payment amount")
     except KeyError:
         return "Invalid payment details: amount"
