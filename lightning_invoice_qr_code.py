@@ -44,29 +44,22 @@ def prompt_for_rpc_path():
             print("Error: Unable to connect to RPC server")
 
 
-def generate_and_display_qr_code(invoice, is_lip=False):
-    if is_lip:
+def generate_qr_code(invoice):
+    if not invoice.startswith(("lightning:", "lnbc:")):
         invoice = "lightning:" + invoice
     qr = qrcode.QRCode(
         version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(invoice)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
-    buffer = BytesIO()
-    img.save(buffer, format='PNG')
-    buffer.seek(0)
-    img = Image.open(buffer)
+    return img
+
+
+def display_qr_code(img):
     img.show()
 
 
-def generate_and_save_qr_code(invoice, file_path, is_lip=False):
-    if is_lip:
-        invoice = "lightning:" + invoice
-    qr = qrcode.QRCode(
-        version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-    qr.add_data(invoice)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
+def save_qr_code(img, file_path):
     img.save(file_path)
 
 
@@ -122,6 +115,9 @@ class Constants:
 
 
 def check_payment_details(invoice, rpc):
+    if not invoice.startswith("lightning:") and not invoice.startswith("lnbc:"):
+        invoice = "lightning:" + invoice
+
     try:
         payment_details = rpc.decodepay(invoice)
     except ValueError:
@@ -335,7 +331,8 @@ def main(output_format, output_stream):
         img_path = input(
             "Enter file path to save QR code image (leave empty to skip): ")
         if img_path:
-            generate_and_save_qr_code(invoice, img_path)
+            img = generate_qr_code(invoice)
+            save_qr_code(img, img_path)
 
         validation_result = check_payment_details(invoice, rpc)
 
