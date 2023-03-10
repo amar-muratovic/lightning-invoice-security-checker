@@ -172,37 +172,25 @@ def check_payment_details(invoice, rpc):
         expiry = decoded['expiry']
         if expiry <= 0:
             raise ValueError("Invoice has expired")
+        elif expiry < 60:
+            raise ValueError("Expiration time is too short")
+        elif expiry > 3600:
+            raise ValueError("Expiration time is too long")
         payment_preimage = decoded['payment_preimage']
         if not payment_preimage:
             raise ValueError("Invalid payment preimage")
+
+        # check metadata
+        metadata = decoded.get('metadata', {})
+        routing_info = metadata.get('routing', [])
+        for route in routing_info:
+            if len(route['pubkey']) != 66:
+                raise ValueError("Invalid routing pubkey")
+
     except KeyError:
         return "Invalid payment details"
     except ValueError as e:
         return "Invalid payment details: " + str(e)
-
-    try:
-        payee_node_id = payment_details['payee_node_id']
-        node_info = get_node_info(payee_node_id)
-        if node_info["pub_key"] != payee_node_id:
-            raise ValueError("Payee node ID does not match payment details")
-        if node_info["alias"] != payment_details["payee"]:
-            raise ValueError("Payee alias does not match payment details")
-    except KeyError:
-        return "Invalid payment details: payee_node_id"
-    except ValueError as e:
-        return "Invalid payment details: " + str(e)
-
-    try:
-        payment_status = rpc.listinvoices(
-            payment_hash)['invoices'][0]['status']
-        if payment_status != 'unpaid':
-            raise ValueError("Invoice has already been paid")
-    except (IndexError, KeyError):
-        return "Invalid payment details: payment_status"
-    except ValueError as e:
-        return "Invalid payment details: " + str(e)
-
-    return "Invoice is valid"
 
 
 def is_invoice_expired(invoice, expiry_time):
