@@ -9,6 +9,7 @@ import argparse
 import nacl.signing
 import json
 import csv
+import requests
 from io import BytesIO
 from PIL import Image
 from pyln.client import LightningRpc
@@ -109,6 +110,30 @@ def scan_qr_code():
     return invoice
 
 
+def get_node_info(node_id):
+    url = f"https://1ml.com/node/{node_id}/json"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise ValueError(
+            f"Error retrieving node information: {response.status_code}")
+    data = response.json()
+    return {
+        'alias': data.get('alias'),
+        'public_key': data.get('public_key'),
+        'num_channels': data.get('num_channels'),
+        'total_capacity': data.get('total_capacity'),
+        'channels': [
+            {
+                'id': channel['short_channel_id'],
+                'capacity': channel['satoshis'],
+                'public_key': channel['node1_pub'] if channel['node1_pub'] != data['public_key'] else channel['node2_pub'],
+                'active': channel['active']
+            }
+            for channel in data.get('channels', [])
+        ]
+    }
+
+
 class Constants:
     PAYMENT_FACTOR = 1000
     MAX_PAYMENT_AMOUNT = 100000000  # 1 BTC in satoshis
@@ -157,10 +182,11 @@ def check_payment_details(invoice, rpc):
 
     try:
         payee_node_id = payment_details['payee_node_id']
-        with requests.Session() as session:
-            r = session.get("https://1ml.com/node/" + payee_node_id)
-            if r.status_code != 200:
-                raise ValueError("Invalid payee node ID")
+        node_info = get_node_info(payee_node_id)
+        if node_info["pub_key"] != payee_node_id:
+            raise ValueError("Payee node ID does not match payment details")
+        if node_info["alias"] != payment_details["payee"]:
+            raise ValueError("Payee alias does not match payment details")
     except KeyError:
         return "Invalid payment details: payee_node_id"
     except ValueError as e:
