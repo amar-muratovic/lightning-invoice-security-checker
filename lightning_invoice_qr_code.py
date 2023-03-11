@@ -316,6 +316,41 @@ def validate_invoice(invoice, recipient, expected_amount, expected_description, 
     return True
 
 
+def validate_invoice_signature(invoice, rpc):
+    """
+    Validates the authenticity of a lightning invoice by checking its signature.
+
+    Args:
+        invoice (str): The lightning invoice to validate.
+        rpc (LightningRpc): The LightningRpc object used to communicate with LND.
+
+    Returns:
+        bool: True if the invoice signature is valid, False otherwise.
+    """
+    if not invoice.startswith("lightning:") and not invoice.startswith("lnbc:"):
+        invoice = "lightning:" + invoice
+
+    try:
+        payment_request = rpc.decodepay(invoice)
+    except ValueError:
+        raise ValueError("Invalid Lightning invoice")
+
+    if 'signature' not in payment_request:
+        raise ValueError("Payment request does not contain a signature")
+
+    pubkey = base64.b64decode(payment_request['payee'])
+    sig = base64.b64decode(payment_request['signature'])
+    data = invoice.encode('utf-8')
+    verify_key = nacl.signing.VerifyKey(
+        pubkey, encoder=nacl.encoding.Base64Encoder())
+    try:
+        verify_key.verify(data, sig)
+    except nacl.exceptions.BadSignatureError:
+        return False
+
+    return True
+
+
 class Invoice:
     def __init__(self, amount):
         self.amount = amount
