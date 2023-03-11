@@ -165,6 +165,31 @@ class Constants:
     MAX_PAYMENT_AMOUNT = 100000000  # 1 BTC in satoshis
 
 
+def validate_and_check_invoice(invoice, rpc):
+    """
+    Validates the signature of the Lightning invoice and checks if the payment details are valid.
+
+    Args:
+        invoice (str): The Lightning invoice to validate and check.
+        rpc: The Lightning RPC object used to check the payment details.
+
+    Returns:
+        str: If the invoice is valid, returns "Invoice is valid and payment details are valid".
+             If the invoice is invalid, returns a string describing the error.
+    """
+
+    # Verify the signature of the invoice
+    if not validate_invoice_signature(invoice):
+        return "Invalid invoice signature"
+
+    # Check the payment details of the invoice
+    payment_details_check = check_payment_details(invoice, rpc)
+    if payment_details_check != "Payment details are valid":
+        return payment_details_check
+
+    return "Invoice is valid and payment details are valid"
+
+
 def check_payment_details(invoice, rpc):
     if not invoice.startswith("lightning:") and not invoice.startswith("lnbc:"):
         invoice = "lightning:" + invoice
