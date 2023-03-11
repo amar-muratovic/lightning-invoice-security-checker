@@ -64,18 +64,21 @@ def save_qr_code(img, file_path):
     img.save(file_path)
 
 
-def decode_qr_code(img_path):
-    with open(img_path, 'rb') as image_file:
-        image = Image.open(io.BytesIO(image_file.read()))
-        image.load()
+def decode_qr_codes(img_paths):
+    invoices = []
+    for img_path in img_paths:
+        with open(img_path, 'rb') as image_file:
+            image = Image.open(io.BytesIO(image_file.read()))
+            image.load()
 
-    codes = pyzbar.decode(image)
-    if not codes:
-        raise ValueError("No QR code found in the image")
+        codes = pyzbar.decode(image)
+        if not codes:
+            raise ValueError("No QR code found in the image")
 
-    invoice = codes[0].data.decode('utf-8')
+        invoice = codes[0].data.decode('utf-8')
+        invoices.append(invoice)
 
-    return invoice
+    return invoices
 
 
 def scan_qr_code():
