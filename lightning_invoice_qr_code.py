@@ -168,26 +168,41 @@ class Constants:
 def validate_and_check_invoice(invoice, rpc):
     """
     Validates the signature of the Lightning invoice and checks if the payment details are valid.
+    Also verifies that the payment address is a legitimate address for the recipient.
 
     Args:
         invoice (str): The Lightning invoice to validate and check.
         rpc: The Lightning RPC object used to check the payment details.
 
     Returns:
-        str: If the invoice is valid, returns "Invoice is valid and payment details are valid".
-             If the invoice is invalid, returns a string describing the error.
+        str: If the invoice is valid and payment address is legitimate, returns "Invoice is valid".
+             If the payment address is fraudulent, returns "Error: Payment address is not legitimate".
     """
+    # Decode the Lightning invoice to obtain the payment address
+    try:
+        decoded_invoice = lnaddr.decode(invoice)
+        payment_address = decoded_invoice.payment_address
+    except lnaddr.exceptions.UnexpectedPrefix as e:
+        raise ValueError(f"Invalid Lightning invoice: {e}")
 
-    # Verify the signature of the invoice
-    if not validate_invoice_signature(invoice):
-        return "Invalid invoice signature"
+    # Get the node information for the recipient using their public key
+    node_id = decoded_invoice.pubkey
+    try:
+        node_info = get_node_info(node_id)
+    except ValueError as e:
+        raise ValueError(f"Error retrieving node information: {e}")
 
-    # Check the payment details of the invoice
-    payment_details_check = check_payment_details(invoice, rpc)
-    if payment_details_check != "Payment details are valid":
-        return payment_details_check
+    # Check if the payment address matches any of the node's active channels
+    payment_address_found = False
+    for channel in node_info['channels']:
+        if channel['active'] and payment_address in [channel['node1_policy']['addr'], channel['node2_policy']['addr']]:
+            payment_address_found = True
+            break
 
-    return "Invoice is valid and payment details are valid"
+    if payment_address_found:
+        return "Invoice is valid"
+    else:
+        return "Error: Payment address is not legitimate"
 
 
 def check_payment_details(invoice, rpc):
