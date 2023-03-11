@@ -162,7 +162,6 @@ def get_node_info(node_id):
 
 
 class Constants:
-    PAYMENT_FACTOR = 1000
     MAX_PAYMENT_AMOUNT = 100000000  # 1 BTC in satoshis
 
 
@@ -176,11 +175,13 @@ def check_payment_details(invoice, rpc):
         return "Invalid Lightning invoice"
 
     try:
-        amount = payment_details['msatoshi'] / 1000
-        if amount <= 0 or amount > 0.042:
+        amount = int(payment_details['msatoshi'])
+        if amount <= 0 or amount > Constants.MAX_PAYMENT_AMOUNT:
             raise ValueError("Invalid payment amount")
     except KeyError:
         return "Invalid payment details: amount"
+    except ValueError as e:
+        return "Invalid payment amount: " + str(e)
 
     try:
         description = payment_details['description']
