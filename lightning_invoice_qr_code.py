@@ -214,10 +214,18 @@ def check_payment_details(invoice, rpc):
             if len(route['pubkey']) != 66:
                 raise ValueError("Invalid routing pubkey")
 
+        # check timestamp
+        timestamp = decoded.get('timestamp')
+        if timestamp is not None:
+            current_time = int(time.time())
+            if timestamp > current_time + 3600 or timestamp < current_time - 3600:
+                raise ValueError("Invalid timestamp")
     except KeyError:
         return "Invalid payment details"
     except ValueError as e:
         return "Invalid payment details: " + str(e)
+
+    return "Payment details are valid"
 
 
 def is_invoice_expired(invoice, expiry_time):
