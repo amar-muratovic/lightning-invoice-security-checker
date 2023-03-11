@@ -10,6 +10,8 @@ import nacl.signing
 import json
 import csv
 import requests
+import lnaddr
+import lnd_grpc.lnrpc as lnrpc
 from io import BytesIO
 from PIL import Image
 from pyln.client import LightningRpc
@@ -76,7 +78,11 @@ def decode_qr_codes(img_paths):
             raise ValueError("No QR code found in the image")
 
         invoice = codes[0].data.decode('utf-8')
-        invoices.append(invoice)
+        try:
+            decoded_invoice = lnaddr.decode(invoice)
+            invoices.append(decoded_invoice)
+        except lnaddr.exceptions.UnexpectedPrefix as e:
+            raise ValueError(f"Invalid Lightning invoice: {e}")
 
     return invoices
 
@@ -324,7 +330,8 @@ def main(output_format, output_stream):
         if os.environ.get('QR_FILE_PATH') and user_input == "":
             img_path = os.environ['QR_FILE_PATH']
             try:
-                invoice = decode_qr_code(img_path)
+                invoices = decode_qr_codes([img_path])
+                invoice = invoices[0]
             except ValueError as e:
                 print("Error:", e)
                 continue
@@ -338,7 +345,8 @@ def main(output_format, output_stream):
             qr_data = scan_qr_code()
             if qr_data:
                 try:
-                    invoice = decode_qr_code(io.BytesIO(qr_data))
+                    invoices = decode_qr_codes([io.BytesIO(qr_data)])
+                    invoice = invoices[0]
                 except ValueError as e:
                     print("Error:", e)
                     continue
