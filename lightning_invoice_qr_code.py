@@ -80,11 +80,13 @@ def decode_qr_codes(img_paths):
         invoice = codes[0].data.decode('utf-8')
         try:
             decoded_invoice = lnaddr.decode(invoice)
+            payment_hash = decoded_invoice.payment_hash.hex()
+            payment_preimage = decoded_invoice.payment_preimage.hex()
             invoices.append(decoded_invoice)
         except lnaddr.exceptions.UnexpectedPrefix as e:
             raise ValueError(f"Invalid Lightning invoice: {e}")
 
-    return invoices
+    return invoices, payment_hash, payment_preimage
 
 
 def scan_qr_code():
