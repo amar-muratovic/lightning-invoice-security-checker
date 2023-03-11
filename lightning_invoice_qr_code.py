@@ -89,6 +89,22 @@ def decode_qr_codes(img_paths):
     return invoices, payment_hash, payment_preimage
 
 
+def generate_qr_code(invoice, file_name=None):
+    if not invoice.startswith(("lightning:", "lnbc:")):
+        invoice = "lightning:" + invoice
+    qr = qrcode.QRCode(
+        version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+    qr.add_data(invoice)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    if file_name:
+        img.save(file_name)
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    qr_code_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    return qr_code_data
+
+
 def scan_qr_code():
     try:
         from PIL import ImageGrab
