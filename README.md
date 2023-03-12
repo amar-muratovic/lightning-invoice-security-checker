@@ -12,15 +12,19 @@ Finally, the script calls the check_invoice function on the decoded invoice and 
 
 To use this Lightning invoice QR code scanner and validator script, you will need to have Python installed on your computer. You will also need to have the following Python libraries installed:
 
-* zbarlight
 * qrcode
-* Pillow
+* pyzbar
+* lnaddr
+* lnrpc
 * pyln.client
+* nacl
+* Pillow
 * requests
+* lndecode
  
  To install these libraries, you can use pip, which is a package manager for Python. Open a command prompt or terminal and enter the following command:
 
-    pip install zbarlight qrcode Pillow pyln-client requests
+    pip install qrcode pyzbar lnaddr lnrpc pyln.client nacl Pillow requests lndecode
 
 Once you have the necessary libraries installed, you can run the script by opening a command prompt or terminal and navigating to the directory where the script is saved. Then enter the following command:
 

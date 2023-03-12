@@ -171,13 +171,15 @@ def generate_qr_code(invoice, file_name=None):
     return qr_code_data
 
 
-def scan_qr_code():
-    try:
-        from PIL import ImageGrab
-    except ImportError:
-        print(
-            "Error: Pillow library not found. Please install it with 'pip install pillow'")
-        quit()
+try:
+    from PIL import ImageGrab
+except ImportError:
+    print("Error: Pillow library not found. Please install it with 'pip install pillow'")
+    quit()
+
+
+def scan_qr_code(timeout=10):
+    start_time = time.time()
 
     parser = argparse.ArgumentParser(
         description='Scan a QR code from the screen')
@@ -189,18 +191,24 @@ def scan_qr_code():
         print("Please position your QR code on the screen")
         input("Press Enter to capture screen...")
 
-    screen = ImageGrab.grab()
-    screen.show()
+    while True:
+        elapsed_time = time.time() - start_time
 
-    # Convert image to grayscale for barcode detection
-    screen = screen.convert('L')
-    codes = pyzbar.decode(screen)
+        if elapsed_time > timeout:
+            raise TimeoutError("Timed out waiting for QR code to be scanned")
 
-    if not codes:
-        raise ValueError("No QR code found in the screen capture")
+        screen = ImageGrab.grab()
+        screen.show()
 
-    invoice = codes[0].data.decode('utf-8')
-    return invoice
+        # Convert image to grayscale for barcode detection
+        screen = screen.convert('L')
+        codes = pyzbar.decode(screen)
+
+        if codes:
+            invoice = codes[0].data.decode('utf-8')
+            return invoice
+
+        time.sleep(1)
 
 
 def get_node_info(node_id):
