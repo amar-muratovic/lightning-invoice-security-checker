@@ -10,6 +10,7 @@ import nacl.signing
 import json
 import csv
 import requests
+import re
 import lnaddr
 import lnd_grpc.lnrpc as lnrpc
 from io import BytesIO
@@ -110,10 +111,47 @@ def is_trusted_source(qr_code, trusted_sources):
     return False
 
 
-def is_valid_qr_code(qr_code):
-    # Check if QR code is valid (e.g. has correct prefix, checksum, etc.)
-    # Add additional checks as needed based on the specific use case
-    # For example, for Bitcoin BIP-21 URIs, the format can be verified using a regular expression
+def is_valid_qr_code(qr_code, bip_type="BIP21"):
+    # Regular expression patterns to match BIP URI formats
+    bip_patterns = {
+        "BIP21": r"^bitcoin:[13][a-km-zA-HJ-NP-Z1-9]{25,34}(\?[a-z]+=[a-zA-Z0-9+%\.]+)*$",
+        "BIP72": r"^bitcoin:([a-z0-9]+@)?[13][a-km-zA-HJ-NP-Z1-9]{25,34}(\?[a-z]+=[a-zA-Z0-9+%\.]+)*$",
+        "BIP73": r"^bitcoin:(\?[\w&=\-\.]+)+$"
+    }
+
+    # Check if the input string matches the specified BIP URI format
+    pattern = bip_patterns.get(bip_type)
+    if not pattern:
+        raise ValueError(f"Unsupported BIP type: {bip_type}")
+    if not re.match(pattern, qr_code):
+        return False
+
+    # Check if the amount parameter is valid (optional)
+    if bip_type in ["BIP21", "BIP72"]:
+        amount_param = re.search(r"\bamount=([\d\.]+)", qr_code)
+        if amount_param:
+            try:
+                amount = float(amount_param.group(1))
+                if amount <= 0:
+                    return False
+            except ValueError:
+                return False
+
+    # Check if the label parameter is valid (optional)
+    if bip_type == "BIP21":
+        label_param = re.search(r"\blabel=([\w\s]+)", qr_code)
+        if label_param:
+            if len(label_param.group(1)) > 50:
+                return False
+
+    # Check if the message parameter is valid (optional)
+    if bip_type in ["BIP21", "BIP72"]:
+        message_param = re.search(r"\bmessage=([\w\s]+)", qr_code)
+        if message_param:
+            if len(message_param.group(1)) > 100:
+                return False
+
+    # All checks passed, return True
     return True
 
 
