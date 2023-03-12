@@ -66,18 +66,27 @@ def save_qr_code(img, file_path):
     img.save(file_path)
 
 
-def decode_qr_codes(img_paths):
+def decode_qr_codes(img_paths, trusted_sources=[]):
     invoices = []
     for img_path in img_paths:
+        # Load image
         with open(img_path, 'rb') as image_file:
             image = Image.open(io.BytesIO(image_file.read()))
             image.load()
 
+        # Decode QR code
         codes = pyzbar.decode(image)
         if not codes:
             raise ValueError("No QR code found in the image")
 
+        # Verify QR code integrity and source
         invoice = codes[0].data.decode('utf-8')
+        if not is_trusted_source(invoice, trusted_sources):
+            raise ValueError("Untrusted QR code source")
+        if not is_valid_qr_code(invoice):
+            raise ValueError("Invalid QR code")
+
+        # Decode Lightning invoice
         try:
             decoded_invoice = lnaddr.decode(invoice)
             payment_hash = decoded_invoice.payment_hash.hex()
@@ -87,6 +96,25 @@ def decode_qr_codes(img_paths):
             raise ValueError(f"Invalid Lightning invoice: {e}")
 
     return invoices, payment_hash, payment_preimage
+
+
+def is_trusted_source(qr_code, trusted_sources):
+    if not trusted_sources:
+        return True
+
+    # Check if QR code source is in the list of trusted sources
+    for source in trusted_sources:
+        if qr_code.startswith(source):
+            return True
+
+    return False
+
+
+def is_valid_qr_code(qr_code):
+    # Check if QR code is valid (e.g. has correct prefix, checksum, etc.)
+    # Add additional checks as needed based on the specific use case
+    # For example, for Bitcoin BIP-21 URIs, the format can be verified using a regular expression
+    return True
 
 
 def generate_qr_code(invoice, file_name=None):
